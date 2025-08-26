@@ -55,3 +55,13 @@ export function insertBinaryMeta(
   const info = stmt.run(payloadPath, len, checksum ?? null);
   return info.lastInsertRowid as number;
 }
+
+export function counts(db: DB) {
+  const ascii = db.prepare(`SELECT COUNT(*) c FROM msgascii`).get() as {
+    c: number;
+  };
+  const bin = db.prepare(`SELECT COUNT(*) c FROM msgbinary`).get() as {
+    c: number;
+  };
+  return { ascii: ascii.c, binary: bin.c, total: ascii.c + bin.c };
+}
