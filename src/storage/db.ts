@@ -34,3 +34,24 @@ function applyMigrations(db: DB) {
   const spool = path.join(process.cwd(), "tmp", "spool");
   fs.mkdirSync(spool, { recursive: true });
 }
+
+export function insertAscii(db: DB, payload: string) {
+  const stmt = db.prepare(
+    `INSERT INTO msgascii (payload, payload_len) VALUES (?, ?)`
+  );
+  const info = stmt.run(payload, payload.length);
+  return info.lastInsertRowid as number;
+}
+
+export function insertBinaryMeta(
+  db: DB,
+  payloadPath: string,
+  len: number,
+  checksum?: string
+) {
+  const stmt = db.prepare(
+    `INSERT INTO msgbinary (payload_path, payload_len, checksum) VALUES (?, ?, ?)`
+  );
+  const info = stmt.run(payloadPath, len, checksum ?? null);
+  return info.lastInsertRowid as number;
+}
