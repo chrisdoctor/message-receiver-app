@@ -5,6 +5,9 @@ import path from "node:path";
 export type DB = Database.Database;
 let db: DB;
 
+const dataDir = path.join(process.cwd(), "data", "bin");
+fs.mkdirSync(dataDir, { recursive: true });
+
 export function openDb(filename: string): DB {
   db = new Database(filename);
   db.pragma("journal_mode = WAL");
@@ -70,9 +73,6 @@ export function counts(db: DB) {
   };
   return { ascii: ascii.c, binary: bin.c, total: ascii.c + bin.c };
 }
-
-const dataDir = path.join(process.cwd(), "data", "bin");
-fs.mkdirSync(dataDir, { recursive: true });
 
 export async function writeAscii(db: DB, payload: string) {
   return insertAscii(db, payload);
