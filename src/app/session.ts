@@ -1,4 +1,4 @@
-import { AEClient } from "../net/aeClient.js";
+import { AEClient } from "./client.js";
 import {
   writeAscii,
   createBinarySpool,
