@@ -55,10 +55,13 @@ export async function runSession(opts: {
 
   // loop until we reach min messages; then request STATUS and drain via timeout policy
   while (true) {
-    const c = counts(db);
-    if (c.total >= opts.minMessages) {
+    // const c = counts(db);
+    // if (c.total >= opts.minMessages) {
+    const totalMessages = asciiCount + binCount;
+    if (totalMessages >= opts.minMessages) {
       log.info(
-        { reached: c.total },
+        // { reached: c.total },
+        { reached: totalMessages },
         "min message target reached, requesting STATUS"
       );
       client.requestStatus();
