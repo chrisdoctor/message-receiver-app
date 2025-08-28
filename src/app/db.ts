@@ -48,7 +48,7 @@ export function insertAscii(db: DB, payload: string) {
   return info.lastInsertRowid as number;
 }
 
-export function insertBinaryMeta(
+export function insertBinary(
   db: DB,
   payloadPath: string,
   len: number,
@@ -69,4 +69,27 @@ export function counts(db: DB) {
     c: number;
   };
   return { ascii: ascii.c, binary: bin.c, total: ascii.c + bin.c };
+}
+
+const dataDir = path.join(process.cwd(), "data", "bin");
+fs.mkdirSync(dataDir, { recursive: true });
+
+export async function writeAscii(db: DB, payload: string) {
+  return insertAscii(db, payload);
+}
+
+export async function createBinarySpool(declaredLen: number) {
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2)}-${declaredLen}.bin`;
+  const tmpPath = path.join(dataDir, name + ".part");
+  return { tmpPath, finalName: name };
+}
+
+export async function finalizeBinary(
+  db: DB,
+  finalPath: string,
+  checksum: string
+) {
+  const stat = fs.statSync(finalPath);
+  const id = insertBinary(db, finalPath, stat.size, checksum);
+  return id;
 }

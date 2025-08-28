@@ -1,11 +1,12 @@
-import { AEClient } from "./client.js";
+import { AEClient } from "./client";
 import {
+  openDb,
+  counts,
   writeAscii,
   createBinarySpool,
   finalizeBinary,
-} from "../storage/writers";
-import { openDb, counts } from "../storage/db";
-import { log } from "../utils/logger.js";
+} from "./db";
+import { log } from "../utils/logger";
 
 export async function runSession(opts: {
   host: string;
