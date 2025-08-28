@@ -78,12 +78,14 @@ export class AEClient {
         // detect start
         const b0 = this.buffer[0];
         if (b0 === ASCII_START) {
+          console.log("ASCII B0", b0);
           this.asciiMode = true;
           this.buffer = this.buffer.subarray(1);
           continue;
         }
         if (b0 === BIN_HEADER && this.buffer.length >= 6) {
-          const len = readUint40(this.buffer, 1, this.opts.lenEndianness);
+          const len = readUint40(this.buffer); //, 1, this.opts.lenEndianness);
+          //   console.log("LEN", len);
           this.binaryMode = true;
           this.binRemaining = len;
           // prepare temp file
@@ -94,23 +96,35 @@ export class AEClient {
           this.h.onLog?.(`binary start: ${len} bytes`);
           continue;
         }
-        // no recognizable start byte yet → drop one byte to resync
+        // no recognizable start byte yet; drop one byte to resync
         this.buffer = this.buffer.subarray(1);
         continue;
       }
 
       if (this.asciiMode) {
         const endIdx = this.buffer.indexOf(ASCII_END);
-        if (endIdx === -1) break; // need more data
+        if (endIdx === -1) {
+          console.log("No ascii end marker in buffer yet");
+          break; // need more data
+        } else {
+          console.log("Ascii end marker already found in buffer");
+        }
         const payloadBuf = this.buffer.subarray(0, endIdx);
         // validate printable ascii
         for (const c of payloadBuf) {
           if (!(c >= 32 && c <= 126) || c === ASCII_START || c === ASCII_END) {
+            this.asciiMode = false;
+            this.buffer.subarray(0, endIdx);
+            console.error("Invalid ASCII payload byte", c);
             throw new Error("Invalid ASCII payload byte");
           }
         }
         const payload = payloadBuf.toString("ascii");
-        if (payload.length < 5) throw new Error("ASCII payload too short");
+        if (payload.length < 5) {
+          this.asciiMode = false;
+          console.error("ASCII payload too short");
+          throw new Error("ASCII payload too short");
+        }
         await this.h.onAscii(payload);
         // consume '$payload;'
         this.buffer = this.buffer.subarray(endIdx + 1);
