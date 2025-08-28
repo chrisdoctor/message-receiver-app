@@ -1,6 +1,6 @@
 import { Command } from "commander";
-import { cfg } from "../util/config.js";
-import { runSession } from "../app/session.js";
+import { cfg } from "../utils/config";
+import { runSession } from "../app/session";
 
 const program = new Command();
 program

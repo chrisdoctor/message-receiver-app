@@ -2,8 +2,8 @@ import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { log } from "../util/logger.js";
-import { getBinPayloadSize } from "../util/binPayloadSize.js";
+import { log } from "../utils/logger.js";
+import { getBinPayloadSize } from "../utils/binPayloadSize.js";
 import { ASCII_START, ASCII_END } from "../proto/ascii.js";
 import { BIN_HEADER } from "../proto/binary.js";
 

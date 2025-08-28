@@ -5,7 +5,7 @@ import {
   finalizeBinary,
 } from "../storage/writers";
 import { openDb, counts } from "../storage/db";
-import { log } from "../util/logger";
+import { log } from "../utils/logger.js";
 
 export async function runSession(opts: {
   host: string;
