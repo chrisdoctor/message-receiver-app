@@ -3,9 +3,9 @@ import {
   writeAscii,
   createBinarySpool,
   finalizeBinary,
-} from "../storage/writers.js";
-import { openDb, counts } from "../storage/db.js";
-import { log } from "../util/logger.js";
+} from "../storage/writers";
+import { openDb, counts } from "../storage/db";
+import { log } from "../util/logger";
 
 export async function runSession(opts: {
   host: string;
@@ -40,7 +40,7 @@ export async function runSession(opts: {
         asciiCount++;
       },
       onBinaryStart: async (declaredLen) => createBinarySpool(declaredLen),
-      onBinaryChunk: async () => {}, // handled internally in client via fs.writeSync
+      onBinaryChunk: async () => {}, // handled internally in client onData processing
       onBinaryComplete: async (finalPath, _declaredLen, checksum) => {
         await finalizeBinary(db, finalPath, checksum!);
         binCount++;
