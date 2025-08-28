@@ -14,6 +14,11 @@ export function openDb(filename: string): DB {
 }
 
 function applyMigrations(db: DB) {
+  // db.exec(`
+  //   DROP TABLE IF EXISTS msgascii;
+  //   DROP TABLE IF EXISTS msgbinary;
+  // `);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS msgascii (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
