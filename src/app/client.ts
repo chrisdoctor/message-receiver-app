@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { log } from "../util/logger.js";
-import { readUint40 } from "../util/bytes.js";
+import { getBinPayloadSize } from "../util/binPayloadSize.js";
 import { ASCII_START, ASCII_END } from "../proto/ascii.js";
 import { BIN_HEADER } from "../proto/binary.js";
 
@@ -84,7 +84,7 @@ export class AEClient {
           continue;
         }
         if (b0 === BIN_HEADER && this.buffer.length >= 6) {
-          const len = readUint40(this.buffer); //, 1, this.opts.lenEndianness);
+          const len = getBinPayloadSize(this.buffer); //, 1, this.opts.lenEndianness);
           //   console.log("LEN", len);
           this.binaryMode = true;
           this.binRemaining = len;
