@@ -24,6 +24,12 @@ export type AEHandlers = {
     declaredLen: number,
     checksum?: string
   ) => Promise<void>;
+  onDiscard?: (
+    payloadPreview: Buffer,
+    payloadType: "ascii" | "binary",
+    totalLen: number,
+    reason: string
+  ) => void | Promise<void>;
   onError: (err: Error) => void;
   onLog?: (msg: string) => void;
 };
@@ -74,7 +80,9 @@ export class AEClient {
     // SINGLE discard check - handles all discard scenarios
     if (this.binDiscardBytes > 0) {
       const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
-      this.h.onLog?.(`Discarding ${toDiscard} bytes of binary payload`);
+      this.h.onLog?.(
+        `Discarding ${toDiscard} bytes of binary payload; ${this.binDiscardBytes - toDiscard} remaining`
+      );
       this.binDiscardBytes -= toDiscard;
 
       if (this.binDiscardBytes === 0) {
@@ -84,7 +92,7 @@ export class AEClient {
       // Process remaining chunk if any
       if (toDiscard < chunk.length) {
         const remainingChunk = chunk.subarray(toDiscard);
-        return this.onData(remainingChunk);
+        this.bufferManager.addChunk(chunk.subarray(toDiscard));
       }
       return;
     }
@@ -130,11 +138,17 @@ export class AEClient {
               len
             );
             if (availableToDiscard > 0) {
+              this.h.onDiscard?.(
+                this.bufferManager.peekBytes(availableToDiscard),
+                "binary",
+                len,
+                "Payload exceeds available disk space"
+              );
               this.bufferManager.consumeBytes(availableToDiscard);
               this.binDiscardBytes -= availableToDiscard;
             }
 
-            // Next onData calls will handle remaining discard via fast path
+            // Next onData calls will handle remaining discard
             continue;
           }
 
@@ -181,7 +195,7 @@ export class AEClient {
         if (!this.isValidAsciiPayload(payloadBuf)) {
           this.asciiMode = false;
           this.bufferManager.consumeBytes(1); // Consume the end marker
-          this.h.onLog?.("Invalid ASCII payload, resetting mode");
+          this.h.onLog?.("Invalid ascii payload, resetting mode");
           continue;
         }
 
@@ -189,7 +203,7 @@ export class AEClient {
         await this.h.onAscii(payload);
         this.asciiMode = false;
         this.bufferManager.consumeBytes(1); // Consume the end marker
-        this.h.onLog?.("ASCII payload processing completed.");
+        this.h.onLog?.("Ascii payload processing completed.");
         continue;
       }
 
@@ -241,13 +255,25 @@ export class AEClient {
 
   private isValidAsciiPayload(payloadBuf: Buffer): boolean {
     if (payloadBuf.length < 5) {
-      this.h.onLog?.("ASCII payload too short");
+      this.h.onLog?.("Payload is too short; discarding payload");
+      this.h.onDiscard?.(
+        payloadBuf.subarray(0, 15),
+        "ascii",
+        payloadBuf.length,
+        "Payload is too short"
+      );
       return false;
     }
 
     for (const c of payloadBuf) {
       if (!(c >= 32 && c <= 126) || c === ASCII_START || c === ASCII_END) {
-        this.h.onLog?.(`Invalid ASCII payload byte: ${c}`);
+        this.h.onLog?.(`Invalid Ascii payload byte: ${c}`);
+        this.h.onDiscard?.(
+          payloadBuf.subarray(0, 15),
+          "ascii",
+          payloadBuf.length,
+          `Invalid Ascii in payload: ${c}`
+        );
         return false;
       }
     }

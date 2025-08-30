@@ -37,6 +37,15 @@ function applyMigrations(db: DB) {
       checksum TEXT,
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS msgdiscarded (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      payload_preview BLOB NOT NULL,
+      payload_type TEXT NOT NULL,
+      payload_total_len INTEGER NOT NULL,
+      discard_reason TEXT NOT NULL,
+      inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   const spool = path.join(process.cwd(), "tmp", "spool");
@@ -92,4 +101,18 @@ export async function finalizeBinary(
   const stat = fs.statSync(finalPath);
   const id = insertBinary(db, finalPath, stat.size, checksum);
   return id;
+}
+
+export function insertDiscarded(
+  db: DB,
+  payload: Buffer,
+  payloadType: "ascii" | "binary",
+  totalLen: number,
+  reason: string
+) {
+  const preview = payload.subarray(0, 15);
+  const stmt = db.prepare(
+    `INSERT INTO msgdiscarded (payload_preview, payload_type, payload_total_len, discard_reason) VALUES (?, ?, ?, ?)`
+  );
+  stmt.run(preview, payloadType, totalLen, reason);
 }

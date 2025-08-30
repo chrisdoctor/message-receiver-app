@@ -5,6 +5,7 @@ import {
   writeAscii,
   createBinarySpool,
   finalizeBinary,
+  insertDiscarded,
 } from "./db";
 import { log } from "../utils/logger";
 
@@ -46,6 +47,8 @@ export async function runSession(opts: {
         await finalizeBinary(db, finalPath, checksum!);
         binCount++;
       },
+      onDiscard: (payloadPreview, payloadType, totalLen, reason) =>
+        insertDiscarded(db, payloadPreview, payloadType, totalLen, reason),
       onError: (e) => log.error(e, "stream error"),
       onLog: (m) => log.info(m),
     }
