@@ -33,12 +33,16 @@ export class AEClient {
   private bufferManager = new BufferManager();
   private asciiMode = false;
   private binaryMode = false;
+  private discardMode = false;
+  private discardBuffer = Buffer.alloc(2 * 1024 * 1024); // 2MB reusable buffer
 
   private binRemaining = 0;
   private binDiscardBytes = 0;
   private binTmpPath = "";
   private binFd: number | null = null;
   private binHash = crypto.createHash("sha256");
+
+  private invalidAsciiPayload = false;
 
   constructor(
     private opts: AEOptions,
@@ -71,6 +75,9 @@ export class AEClient {
   }
 
   private async onData(chunk: Buffer) {
+    // Skip normal processing if we're in active fast discard
+    if (this.discardMode) return;
+
     // if discarding, handle immediately without buffering
     if (this.binDiscardBytes > 0) {
       const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
@@ -100,42 +107,51 @@ export class AEClient {
         if (firstByte === ASCII_START) {
           this.asciiMode = true;
           this.bufferManager.consumeBytes(1);
+          this.h.onLog?.(`Ascii payload received`);
           continue;
         }
 
-        if (firstByte === BIN_HEADER && this.bufferManager.hasBytes(6)) {
-          const headerBuffer = this.bufferManager.peekBytes(6);
-          const len = getBinPayloadSize(headerBuffer);
-          this.bufferManager.consumeBytes(6); // Remove header
+        // if (firstByte === BIN_HEADER && this.bufferManager.hasBytes(6)) {
+        //   const headerBuffer = this.bufferManager.peekBytes(6);
+        //   const len = getBinPayloadSize(headerBuffer);
+        //   this.bufferManager.consumeBytes(6); // Remove header
 
-          const canPayloadFit = await canFitOnDisk(len);
-          if (canPayloadFit === false) {
-            this.h.onLog?.("Not enough disk space; entering discard mode");
+        //   this.h.onLog?.(
+        //     `Binary payload to be received with size ${len} bytes`
+        //   );
 
-            // Set discard mode and immediately discard available data
-            this.binDiscardBytes = len;
-            const available = this.bufferManager.getTotalSize();
-            const toDiscard = Math.min(available, this.binDiscardBytes);
+        //   const canPayloadFit = await canFitOnDisk(len);
+        //   // if (canPayloadFit === false) {
+        //   //   this.h.onLog?.("Not enough disk space; entering discard mode");
 
-            if (toDiscard > 0) {
-              this.bufferManager.consumeBytes(toDiscard);
-              this.binDiscardBytes -= toDiscard;
-            }
+        //   //   // Set discard mode and immediately discard available data
+        //   //   this.binDiscardBytes = len;
+        //   //   const available = this.bufferManager.getTotalSize();
+        //   //   const toDiscard = Math.min(available, this.binDiscardBytes);
 
-            // Exit processing - next chunk will hit fast discard path
-            return;
-          }
+        //   //   if (toDiscard > 0) {
+        //   //     this.bufferManager.consumeBytes(toDiscard);
+        //   //     this.binDiscardBytes -= toDiscard;
+        //   //   }
 
-          this.binaryMode = true;
-          this.binRemaining = len;
-          // Prepare temp file
-          const { tmpPath } = await this.h.onBinaryStart(len);
-          this.binTmpPath = tmpPath;
-          this.binFd = fs.openSync(this.binTmpPath, "w");
-          this.bufferManager.consumeBytes(6);
-          this.h.onLog?.(`binary start: ${len} bytes`);
-          continue;
-        }
+        //   //   // Exit processing - next chunk will hit fast discard path
+        //   //   return;
+        //   // }
+        //   if (canPayloadFit === false) {
+        //     this.h.onLog?.("Not enough disk space; entering fast discard mode");
+        //     await this.enterDiscardMode(this.sock, len);
+        //     return;
+        //   }
+
+        //   this.binaryMode = true;
+        //   this.binRemaining = len;
+        //   // Prepare temp file
+        //   const { tmpPath } = await this.h.onBinaryStart(len);
+        //   this.binTmpPath = tmpPath;
+        //   this.binFd = fs.openSync(this.binTmpPath, "w");
+        //   this.bufferManager.consumeBytes(6);
+        //   continue;
+        // }
 
         // No recognizable start byte; drop one byte to resync
         this.bufferManager.consumeBytes(1);
@@ -143,36 +159,52 @@ export class AEClient {
       }
 
       if (this.asciiMode) {
+        this.h.onLog?.(
+          `Processing payload in ascii mode with ${this.bufferManager.getTotalSize()} bytes in buffer.`
+        );
         const endIdx = this.bufferManager.findByteInBuffer(ASCII_END);
         if (endIdx === -1) {
-          console.log("No ascii end marker in buffer yet");
+          this.h.onLog?.(
+            "No ascii end marker in buffer yet. Reading more data"
+          );
           break; // Need more data
         }
 
-        console.log("Ascii end marker already found in buffer");
+        // this.h.onLog?.("Ascii end marker already found in buffer");
         const payloadBuf = this.bufferManager.extractBytes(endIdx);
+
+        this.h.onLog?.(`Ascii payload is ${payloadBuf.length} bytes.`);
 
         // Validate printable ascii
         for (const c of payloadBuf) {
           if (!(c >= 32 && c <= 126) || c === ASCII_START || c === ASCII_END) {
+            this.invalidAsciiPayload = true;
             this.asciiMode = false;
+            this.bufferManager.consumeBytes(1); // Consume the end marker
+
             this.h.onLog?.(`Invalid ASCII in payload: ${c}. Discarding data`);
-            continue;
+            break;
           }
         }
 
-        const payload = payloadBuf.toString("ascii");
-        if (payload.length < 5) {
-          this.asciiMode = false;
-          this.h.onLog?.(
-            `ASCII payload too short: ${payload.length} bytes. Discarding data`
-          );
+        if (this.invalidAsciiPayload) {
+          this.invalidAsciiPayload = false;
           continue;
         }
+
+        const payload = payloadBuf.toString("ascii");
+        // if (payload.length < 5) {
+        //   this.asciiMode = false;
+        //   this.h.onLog?.(
+        //     `ASCII payload too short: ${payload.length} bytes. Discarding data`
+        //   );
+        //   continue;
+        // }
 
         await this.h.onAscii(payload);
         this.bufferManager.consumeBytes(1); // Consume the end marker
         this.asciiMode = false;
+        this.h.onLog?.("ASCII payload processing completed.");
         continue;
       }
 
@@ -182,6 +214,10 @@ export class AEClient {
         const toWrite = Math.min(
           this.bufferManager.getTotalSize(),
           this.binRemaining
+        );
+
+        this.h.onLog?.(
+          `Processing binary data chunk with size ${toWrite} bytes`
         );
 
         // Write directly from chunks without concatenating
@@ -214,6 +250,81 @@ export class AEClient {
       fs.writeSync(this.binFd, chunkSlice);
       this.binHash.update(chunkSlice);
     });
+  }
+
+  private async enterDiscardMode(
+    socket: net.Socket,
+    bytesToDiscard: number
+  ): Promise<void> {
+    this.binDiscardBytes = bytesToDiscard;
+    this.discardMode = true;
+
+    this.h.onLog?.("Entering discard mode function");
+
+    // Immediately try to read larger chunks manually
+    await this.performFastDiscard(socket);
+  }
+
+  private async performFastDiscard(socket: net.Socket): Promise<void> {
+    // Temporarily pause the normal data event
+    socket.pause();
+
+    try {
+      this.h.onLog?.(
+        `Starting fast discard with this.binDiscardBytes = ${this.binDiscardBytes}`
+      );
+      this.h.onLog?.(`this.discardBuffer.length =${this.discardBuffer.length}`);
+      while (this.binDiscardBytes > 0) {
+        // Try to read a large chunk directly
+        const chunkSize = Math.min(
+          this.discardBuffer.length,
+          this.binDiscardBytes
+        );
+        this.h.onLog?.(`chunkSize = ${chunkSize}`);
+
+        let chunk = socket.read(chunkSize);
+
+        this.h.onLog?.(`chunk read = ${chunk ? chunk.length : null}`);
+
+        // if (!chunk) {
+        //   // No data available, wait for more
+        //   await new Promise<void>((resolve) => {
+        //     const onReadable = () => {
+        //       socket.off("readable", onReadable);
+        //       resolve();
+        //     };
+        //     socket.on("readable", onReadable);
+        //   });
+        //   continue;
+        // }
+
+        if (!chunk) {
+          await new Promise<void>((resolve) => {
+            socket.once("readable", resolve);
+          });
+          // chunk = socket.read(chunkSize);
+          continue;
+        }
+
+        this.binDiscardBytes -= chunk.length;
+
+        this.h.onLog?.(
+          `Discarded ${chunk.length} bytes, ${(this, this.binDiscardBytes)} left.`
+        );
+
+        // Log progress for very large discards
+        if (this.binDiscardBytes % (10 * 1024 * 1024) === 0) {
+          this.h.onLog?.(
+            `Discarding: ${Math.round(this.binDiscardBytes / 1024 / 1024)}MB remaining`
+          );
+        }
+      }
+    } finally {
+      this.h.onLog?.("About to end discard mode");
+      this.discardMode = false;
+      socket.resume(); // Resume normal event processing
+      this.h.onLog?.("Finished fast discard mode");
+    }
   }
 
   requestStatus() {
