@@ -74,6 +74,7 @@ export class AEClient {
     // SINGLE discard check - handles all discard scenarios
     if (this.binDiscardBytes > 0) {
       const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
+      this.h.onLog?.(`Discarding ${toDiscard} bytes of binary payload`);
       this.binDiscardBytes -= toDiscard;
 
       if (this.binDiscardBytes === 0) {
@@ -222,6 +223,8 @@ export class AEClient {
           fs.renameSync(this.binTmpPath, finalPath);
           await this.h.onBinaryComplete(finalPath, 0, checksum);
           this.binaryMode = false;
+
+          this.h.onLog?.("Processing binary data completed.");
         }
         continue;
       }
