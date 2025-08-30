@@ -10,15 +10,10 @@ export function getBinPayloadSize(buffer: Buffer): number {
   }
 
   // Read the 5 bytes and convert to decimal
-  // Using big-endian byte order (most significant byte first)
+  // Using big-endian byte order
   let result = 0;
 
   for (let i = 0; i < 5; i++) {
-    console.log("=========");
-    console.log("offset + i", offset + i);
-    console.log("buffer[offset + i]", buffer[offset + i]);
-    console.log("result", result);
-
     if (buffer[offset + i] !== 0) {
       result = result * 256 + buffer[offset + i];
     }
