@@ -111,6 +111,30 @@ docker run --rm \
   aetheric-node npm run validate:full
 ```
 
+Sample validation report:
+
+```
+[ASCII]
+  rows..................32
+  invalid...............0  ✅
+  min/avg/max length....86 / 774.41 / 1517
+
+[BINARY]
+  rows..................15
+  files missing.........12  ❌
+  size mismatches.......0  ✅
+  checksum mismatches...0  ✅
+  sampled for checksum...15
+  min/avg/max bytes.....9481 / 30471 / 45320
+
+[CROSS]
+  total messages........47
+  >= expected min (600)...no ❌
+
+FAIL ❌
+Report written: report/validator-report-31082025-193612.json
+```
+
 ---
 
 ## Notes
