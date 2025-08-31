@@ -16,7 +16,7 @@ export type AEOptions = {
   port: number;
   jwt: string;
   readTimeoutMs: number;
-  chunkBytes: number;
+  // chunkBytes: number;
 };
 
 export type AEHandlers = {
@@ -50,6 +50,9 @@ export class AEClient {
   private binFd: number | null = null;
   private binHash = crypto.createHash("sha256");
 
+  private processing = false;
+  private chunkQueue: Buffer[] = [];
+
   constructor(
     private opts: AEOptions,
     private h: AEHandlers
@@ -66,12 +69,12 @@ export class AEClient {
 
       s.setTimeout(this.opts.readTimeoutMs, () => {
         this.h.onLog?.(`read timeout ${this.opts.readTimeoutMs}ms`);
+        s.end();
       });
 
       s.once("error", reject);
       s.once("connect", () => {
         this.h.onLog?.("connected");
-        // AUTH
         s.write(`AUTH ${this.opts.jwt}\r\n`);
         resolve();
       });
@@ -80,9 +83,6 @@ export class AEClient {
       s.on("close", () => this.h.onLog?.("socket closed"));
     });
   }
-
-  private processing = false;
-  private chunkQueue: Buffer[] = [];
 
   private async onData(chunk: Buffer) {
     this.chunkQueue.push(chunk);
@@ -99,177 +99,182 @@ export class AEClient {
 
   // AI-Assisted code generation
   private async _processData(chunk: Buffer) {
-    // SINGLE discard check - handles all discard scenarios
+    // Handle discards first
     if (this.binDiscardBytes > 0) {
-      const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
-      // this.h.onLog?.(
-      //   `Discarding ${toDiscard} bytes of binary payload; ${this.binDiscardBytes - toDiscard} remaining`
-      // );
-      this.binDiscardBytes -= toDiscard;
-
-      if (this.binDiscardBytes === 0) {
-        this.h.onLog?.("Finished discarding oversized binary payload");
-      }
-
-      // Process remaining chunk if any
-      if (toDiscard < chunk.length) {
-        // const remainingChunk = chunk.subarray(toDiscard);
-        this.bufferManager.addChunk(chunk.subarray(toDiscard));
-      }
+      this.handleDiscardBytes(chunk);
       return;
     }
 
-    // Add chunk to buffer manager
     this.bufferManager.addChunk(chunk);
 
-    // Process all available data
     while (this.bufferManager.getTotalSize() > 0) {
       if (!this.binaryMode && !this.asciiMode) {
-        // Detect start of message
-        const firstByte = this.bufferManager.peekFirstByte();
-        if (firstByte === null) break;
-
-        if (firstByte === ASCII_START) {
-          this.asciiMode = true;
-          this.bufferManager.consumeBytes(1);
-          this.h.onLog?.(`Ascii payload received`);
-          continue;
-        }
-
-        if (firstByte === BIN_HEADER && this.bufferManager.hasBytes(6)) {
-          const headerBuffer = this.bufferManager.peekBytes(6);
-          const len = getBinPayloadSize(headerBuffer);
-
-          this.h.onLog?.(
-            `Binary payload to be received with size ${len} bytes.`
-          );
-
-          const canPayloadFit = await canFitOnDisk(len);
-
-          // Always consume header regardless of disk space
-          this.bufferManager.consumeBytes(6);
-
-          if (canPayloadFit === false) {
-            // Simple discard mode - just set the counter
-            this.h.onLog?.("Not enough disk space; discarding binary payload");
-            this.binDiscardBytes = len;
-
-            // Clear the temporary file if it was created
-            this.deleteBinFile(this.binTmpPath);
-            this.binTmpPath = "";
-
-            // Immediately discard any available payload data
-            const availableToDiscard = Math.min(
-              this.bufferManager.getTotalSize(),
-              len
-            );
-            if (availableToDiscard > 0) {
-              this.h.onDiscard?.(
-                this.bufferManager.peekBytes(availableToDiscard),
-                "binary",
-                len,
-                "Payload exceeds available disk space"
-              );
-              this.bufferManager.consumeBytes(availableToDiscard);
-              this.binDiscardBytes -= availableToDiscard;
-            }
-
-            // Next onData calls will handle remaining discard
-            continue;
-          }
-
-          this.binaryMode = true;
-          this.binRemaining = len;
-
-          try {
-            const { tmpPath } = await this.h.onBinaryStart(len);
-            this.binTmpPath = tmpPath;
-            this.binFd = fs.openSync(this.binTmpPath, "w");
-          } catch (error) {
-            // If file setup fails, enter discard mode
-            this.h.onLog?.("Failed to create temp file; discarding payload");
-            this.binaryMode = false;
-            this.binDiscardBytes = len;
-            continue;
-          }
-          continue;
-        }
-
+        if (this.detectAsciiStart()) continue;
+        if (await this.detectBinaryStart()) continue;
         // No recognizable start byte; drop one byte to resync
         this.bufferManager.consumeBytes(1);
         continue;
       }
 
       if (this.asciiMode) {
-        this.h.onLog?.(
-          `Processing payload in ascii mode with ${this.bufferManager.getTotalSize()} bytes in buffer.`
-        );
-        const endIdx = this.bufferManager.findByteInBuffer(ASCII_END);
-        if (endIdx === -1) {
-          this.h.onLog?.(
-            "No ascii end marker in buffer yet. Reading more data"
-          );
-          break; // Need more data
-        }
-
-        // this.h.onLog?.("Ascii end marker already found in buffer");
-        const payloadBuf = this.bufferManager.extractBytes(endIdx);
-
-        this.h.onLog?.(`Ascii payload is ${payloadBuf.length} bytes.`);
-
-        // Validate ascii payload
-        if (!this.isValidAsciiPayload(payloadBuf)) {
-          this.asciiMode = false;
-          this.bufferManager.consumeBytes(1); // Consume the end marker
-          this.h.onLog?.("Invalid ascii payload, resetting mode");
-          continue;
-        }
-
-        const payload = payloadBuf.toString("ascii");
-        await this.h.onAscii(payload);
-        this.asciiMode = false;
-        this.bufferManager.consumeBytes(1); // Consume the end marker
-        this.h.onLog?.("Ascii payload processing completed.");
-        continue;
+        if (await this.processAsciiMode()) continue;
+        break;
       }
 
       if (this.binaryMode) {
-        if (this.bufferManager.getTotalSize() === 0) break;
-
-        const toWrite = Math.min(
-          this.bufferManager.getTotalSize(),
-          this.binRemaining
-        );
-
-        // this.h.onLog?.(
-        //   `Processing binary data chunk with size ${toWrite} bytes`
-        // );
-
-        // Write directly from chunks without concatenating
-        this.writeFromChunks(toWrite);
-
-        this.binRemaining -= toWrite;
-        this.bufferManager.consumeBytes(toWrite);
-
-        if (this.binRemaining === 0) {
-          // Close file, finalize
-          if (this.binFd === null) throw new Error("bin fd missing");
-          fs.closeSync(this.binFd);
-          this.binFd = null;
-          const checksum = this.binHash.digest("hex");
-          this.binHash = crypto.createHash("sha256"); // reset
-          // Move tmpfile to final
-          const finalPath = this.binTmpPath.replace(/\.part$/, "");
-          fs.renameSync(this.binTmpPath, finalPath);
-          await this.h.onBinaryComplete(finalPath, 0, checksum);
-          this.binaryMode = false;
-
-          this.h.onLog?.("Processing binary data completed.");
-        }
-        continue;
+        if (await this.processBinaryMode()) continue;
+        break;
       }
     }
   }
+
+  // --- Mode Detection and Processing ---
+
+  private detectAsciiStart(): boolean {
+    const firstByte = this.bufferManager.peekFirstByte();
+    if (firstByte === ASCII_START) {
+      this.asciiMode = true;
+      this.bufferManager.consumeBytes(1);
+      this.h.onLog?.(`Ascii payload received`);
+      return true;
+    }
+    return false;
+  }
+
+  private async detectBinaryStart(): Promise<boolean> {
+    const firstByte = this.bufferManager.peekFirstByte();
+    if (firstByte === BIN_HEADER && this.bufferManager.hasBytes(6)) {
+      const headerBuffer = this.bufferManager.peekBytes(6);
+      const len = getBinPayloadSize(headerBuffer);
+
+      this.h.onLog?.(`Binary payload to be received with size ${len} bytes.`);
+
+      const canPayloadFit = await canFitOnDisk(len);
+
+      // Always consume header regardless of disk space
+      this.bufferManager.consumeBytes(6);
+
+      if (!canPayloadFit) {
+        this.handleBinaryDiscard(len, "Payload exceeds available disk space");
+        return true;
+      }
+
+      this.binaryMode = true;
+      this.binRemaining = len;
+
+      try {
+        const { tmpPath } = await this.h.onBinaryStart(len);
+        this.binTmpPath = tmpPath;
+        this.binFd = fs.openSync(this.binTmpPath, "w");
+      } catch (error) {
+        this.h.onLog?.("Failed to create temp file; discarding payload");
+        this.binaryMode = false;
+        this.binDiscardBytes = len;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private async processAsciiMode(): Promise<boolean> {
+    this.h.onLog?.(
+      `Processing payload in ascii mode with ${this.bufferManager.getTotalSize()} bytes in buffer.`
+    );
+    const endIdx = this.bufferManager.findByteInBuffer(ASCII_END);
+    if (endIdx === -1) {
+      this.h.onLog?.("No ascii end marker in buffer yet. Reading more data");
+      return false; // Need more data
+    }
+
+    const payloadBuf = this.bufferManager.extractBytes(endIdx);
+
+    this.h.onLog?.(`Ascii payload is ${payloadBuf.length} bytes.`);
+
+    if (!this.isValidAsciiPayload(payloadBuf)) {
+      this.asciiMode = false;
+      this.bufferManager.consumeBytes(1); // Consume the end marker
+      this.h.onLog?.("Invalid ascii payload, resetting mode");
+      return true;
+    }
+
+    const payload = payloadBuf.toString("ascii");
+    await this.h.onAscii(payload);
+    this.asciiMode = false;
+    this.bufferManager.consumeBytes(1); // Consume the end marker
+    this.h.onLog?.("Ascii payload processing completed.");
+    return true;
+  }
+
+  private async processBinaryMode(): Promise<boolean> {
+    if (this.bufferManager.getTotalSize() === 0) return false;
+
+    const toWrite = Math.min(
+      this.bufferManager.getTotalSize(),
+      this.binRemaining
+    );
+
+    this.writeFromChunks(toWrite);
+
+    this.binRemaining -= toWrite;
+    this.bufferManager.consumeBytes(toWrite);
+
+    if (this.binRemaining === 0) {
+      await this.finalizeBinaryPayload();
+      return true;
+    }
+    return true;
+  }
+
+  // --- Discard Handling ---
+
+  private handleDiscardBytes(chunk: Buffer) {
+    const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
+    this.binDiscardBytes -= toDiscard;
+
+    if (this.binDiscardBytes === 0) {
+      this.h.onLog?.("Finished discarding oversized binary payload");
+    }
+
+    if (toDiscard < chunk.length) {
+      this.bufferManager.addChunk(chunk.subarray(toDiscard));
+    }
+  }
+
+  private handleBinaryDiscard(len: number, reason: string) {
+    this.h.onLog?.("Not enough disk space; discarding binary payload");
+    this.binDiscardBytes = len;
+    this.deleteBinFile(this.binTmpPath);
+    this.binTmpPath = "";
+
+    const availableToDiscard = Math.min(this.bufferManager.getTotalSize(), len);
+    if (availableToDiscard > 0) {
+      this.h.onDiscard?.(
+        this.bufferManager.peekBytes(availableToDiscard),
+        "binary",
+        len,
+        reason
+      );
+      this.bufferManager.consumeBytes(availableToDiscard);
+      this.binDiscardBytes -= availableToDiscard;
+    }
+  }
+
+  // --- Binary Payload Finalization ---
+
+  private async finalizeBinaryPayload() {
+    if (this.binFd === null) throw new Error("bin fd missing");
+    fs.closeSync(this.binFd);
+    this.binFd = null;
+    const checksum = this.binHash.digest("hex");
+    this.binHash = crypto.createHash("sha256"); // reset
+    const finalPath = this.binTmpPath.replace(/\.part$/, "");
+    fs.renameSync(this.binTmpPath, finalPath);
+    await this.h.onBinaryComplete(finalPath, 0, checksum);
+    this.binaryMode = false;
+    this.h.onLog?.("Processing binary data completed.");
+  }
+
+  // --- File and Payload Utilities ---
 
   private writeFromChunks(totalBytes: number): void {
     this.bufferManager.forEachChunk(totalBytes, (chunkSlice, _isLast) => {
@@ -319,6 +324,8 @@ export class AEClient {
     }
     return true;
   }
+
+  // --- Public API ---
 
   requestStatus() {
     this.sock?.write(`STATUS\r\n`);
