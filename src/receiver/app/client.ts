@@ -2,7 +2,12 @@ import net from "net";
 import fs from "fs";
 import crypto from "crypto";
 import { getBinPayloadSize } from "../utils/binPayloadSize";
-import { ASCII_START, ASCII_END, BIN_HEADER } from "./protocols.js";
+import {
+  ASCII_START,
+  ASCII_END,
+  BIN_HEADER,
+  isPrintableAscii,
+} from "./protocols.js";
 import { canFitOnDisk } from "../utils/diskSpace";
 import { BufferManager } from "./bufferManager";
 
@@ -12,7 +17,6 @@ export type AEOptions = {
   jwt: string;
   readTimeoutMs: number;
   chunkBytes: number;
-  lenEndianness: "big" | "little";
 };
 
 export type AEHandlers = {
@@ -51,6 +55,7 @@ export class AEClient {
     private h: AEHandlers
   ) {}
 
+  // AI-Assisted code generation
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       const s = net.createConnection({
@@ -282,7 +287,7 @@ export class AEClient {
     }
 
     for (const c of payloadBuf) {
-      if (!(c >= 32 && c <= 126) || c === ASCII_START || c === ASCII_END) {
+      if (!isPrintableAscii(c)) {
         this.h.onLog?.(`Invalid Ascii payload byte: ${c}`);
         this.h.onDiscard?.(
           payloadBuf.subarray(0, 15),

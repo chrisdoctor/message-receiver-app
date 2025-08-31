@@ -14,11 +14,11 @@ program
   .option("--rt <ms>", "Read timeout ms", `${cfg.READ_TIMEOUT_MS}`)
   .option("--quiet <ms>", "Max quiet drain ms", `${cfg.QUIET_MAX_MS}`)
   .option("--chunk <bytes>", "Read chunk bytes", `${cfg.CHUNK_BYTES}`)
-  .option(
-    "--endian <big|little>",
-    "5-byte length endianness",
-    cfg.LEN_ENDIANNESS
-  )
+  // .option(
+  //   "--endian <big|little>",
+  //   "5-byte length endianness",
+  //   cfg.LEN_ENDIANNESS
+  // )
   .action(async (opts) => {
     await runSession({
       host: opts.host,
@@ -29,7 +29,6 @@ program
       readTimeoutMs: parseInt(opts.rt, 10),
       quietMaxMs: parseInt(opts.quiet, 10),
       chunkBytes: parseInt(opts.chunk, 10),
-      lenEndianness: opts.endian,
     });
   });
 

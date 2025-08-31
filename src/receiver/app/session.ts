@@ -16,7 +16,6 @@ export async function runSession(opts: {
   jwt: string;
   readTimeoutMs: number;
   chunkBytes: number;
-  lenEndianness: "big" | "little";
   sqlitePath: string;
   minMessages: number;
   quietMaxMs: number;
@@ -36,7 +35,6 @@ export async function runSession(opts: {
       jwt: opts.jwt,
       readTimeoutMs: opts.readTimeoutMs,
       chunkBytes: opts.chunkBytes,
-      lenEndianness: opts.lenEndianness,
     },
     {
       onAscii: async (payload) => {
