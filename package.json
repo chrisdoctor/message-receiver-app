@@ -4,9 +4,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/receiver/cli/collector.ts",
+    "dev": "tsx src/receiver/cli/app-runner.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/receiver/cli/collector.js",
+    "start": "node dist/receiver/cli/app-runner.js",
     "lint": "eslint . --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
