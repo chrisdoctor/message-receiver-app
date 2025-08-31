@@ -76,7 +76,23 @@ export class AEClient {
     });
   }
 
+  private processing = false;
+  private chunkQueue: Buffer[] = [];
+
   private async onData(chunk: Buffer) {
+    this.chunkQueue.push(chunk);
+    if (this.processing) return;
+    this.processing = true;
+
+    while (this.chunkQueue.length > 0) {
+      const nextChunk = this.chunkQueue.shift()!;
+      await this._processData(nextChunk);
+    }
+
+    this.processing = false;
+  }
+
+  private async _processData(chunk: Buffer) {
     // SINGLE discard check - handles all discard scenarios
     if (this.binDiscardBytes > 0) {
       const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
@@ -91,7 +107,7 @@ export class AEClient {
 
       // Process remaining chunk if any
       if (toDiscard < chunk.length) {
-        const remainingChunk = chunk.subarray(toDiscard);
+        // const remainingChunk = chunk.subarray(toDiscard);
         this.bufferManager.addChunk(chunk.subarray(toDiscard));
       }
       return;
