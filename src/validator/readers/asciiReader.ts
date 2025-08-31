@@ -5,6 +5,7 @@ function isPrintableAsciiCode(n: number): boolean {
   return n >= 0x20 && n <= 0x7e && n !== 0x24 /* $ */ && n !== 0x3b /* ; */;
 }
 
+// AI-assisted
 export function validateAscii(db: Database.Database): AsciiStats {
   const q = db.prepare<
     unknown[],

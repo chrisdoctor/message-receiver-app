@@ -1,5 +1,6 @@
 import { ValidatorReport } from "./types.js";
 
+// AI-assisted
 export function printHuman(report: ValidatorReport) {
   const pad = (s: string, n = 22) => (s + "...").padEnd(n, ".");
   console.log(`Validator — mode=${report.mode}, sha=${report.sha}`);

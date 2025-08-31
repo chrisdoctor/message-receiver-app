@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+// AI-assisted
+
 import { Command, Option } from "commander";
 import "dotenv/config";
 import path from "path";

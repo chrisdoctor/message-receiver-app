@@ -1,5 +1,11 @@
-import checkDiskSpace from "check-disk-space";
+import checkDiskSpaceImport from "check-disk-space";
 import path from "path";
+
+// For CommonJS default export compatibility
+const checkDiskSpace =
+  typeof checkDiskSpaceImport === "function"
+    ? checkDiskSpaceImport
+    : checkDiskSpaceImport.default;
 
 export async function canFitOnDisk(
   sizeInBytes: number,

@@ -1,3 +1,5 @@
+// AI - assisted
+
 import fs from "node:fs";
 import Database from "better-sqlite3";
 import { BinaryStats, Mode, ShaMode } from "../report/types.js";

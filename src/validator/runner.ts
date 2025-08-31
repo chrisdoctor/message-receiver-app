@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
-import { validateAscii } from "./readers/asciiReader";
-import { validateBinary } from "./readers/binaryReader";
-import { Mode, ShaMode, ValidatorReport, CrossStats } from "./report/types";
+import { validateAscii } from "./readers/asciiReader.js";
+import { validateBinary } from "./readers/binaryReader.js";
+import { Mode, ShaMode, ValidatorReport, CrossStats } from "./report/types.js";
 
 export async function runValidation(opts: {
   dbPath: string;
