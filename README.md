@@ -48,10 +48,12 @@ Create a .env file in the project root. Example:
 ```sh
 AE_HOST=aetheric.engine.host
 AE_PORT=8080
-AE_JWT=your-jwt-token
+AE_JWT=jwt-token
 SQLITE_PATH=./sqlite-db/ae.db
 BINARY_SPOOL_DIR=./data/bin
 VALIDATOR_REPORT_FOLDER=./report
+MIN_MESSAGES=600
+READ_TIMEOUT_MS=5000
 ```
 
 ### Aetheric Engine
@@ -63,6 +65,10 @@ VALIDATOR_REPORT_FOLDER=./report
 * **`SQLITE_PATH`**: Path to the SQLite database file.
 * **`BINARY_SPOOL_DIR`**: Directory for temporary binary spool files.
 * **`VALIDATOR_REPORT_FOLDER`**: Directory for validator output reports.
+
+### Session & Timeout
+* **`MIN_MESSAGES`**: Minimum number of messages to collect before triggering shutdown and validation.
+* **`READ_TIMEOUT_MS`**: Milliseconds to wait for data to drain on the TCP connection before shutdown.
 
 ---
 
