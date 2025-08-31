@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
 import "dotenv/config";
+import path from "path";
+import * as fs from "fs";
 import { runValidation } from "./runner";
 import { printHuman } from "./report/printer";
 import { writeJsonReport } from "./report/json";
@@ -15,6 +17,28 @@ if (!ENV_DB_PATH || ENV_DB_PATH.trim() === "") {
     "Error: SQLITE_PATH must be set in the .env (path to the SQLite DB)."
   );
   process.exit(1);
+}
+
+// Require report folder from env; do NOT allow CLI override
+const REPORT_FOLDER = process.env.VALIDATOR_REPORT_FOLDER;
+if (!REPORT_FOLDER || REPORT_FOLDER.trim() === "") {
+  console.error(
+    "Error: VALIDATOR_REPORT_FOLDER must be set in the .env (folder for reports)."
+  );
+  process.exit(1);
+}
+
+// Helper to format date as ddmmyyyy-hhmmss
+function getReportFileName() {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const dd = pad(now.getDate());
+  const mm = pad(now.getMonth() + 1);
+  const yyyy = now.getFullYear();
+  const hh = pad(now.getHours());
+  const min = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  return `validator-report-${dd}${mm}${yyyy}-${hh}${min}${ss}.json`;
 }
 
 program
@@ -37,11 +61,6 @@ program
     (v) => parseInt(v, 10),
     600
   )
-  .option(
-    "--json-out <path>",
-    "Write JSON report to file",
-    "./validator-report.json"
-  )
   .action(async (opts) => {
     try {
       const rep = await runValidation({
@@ -57,10 +76,15 @@ program
       });
 
       printHuman(rep);
-      if (opts.jsonOut) {
-        await writeJsonReport(opts.jsonOut, rep);
-        console.log(`Report written: ${opts.jsonOut}`);
+      // Ensure report folder exists
+      if (!fs.existsSync(REPORT_FOLDER)) {
+        fs.mkdirSync(REPORT_FOLDER, { recursive: true });
       }
+      const reportFileName = getReportFileName();
+      const reportPath = path.join(REPORT_FOLDER, reportFileName);
+
+      await writeJsonReport(reportPath, rep);
+      console.log(`Report written: ${reportPath}`);
       process.exit(rep.pass ? 0 : 2);
     } catch (err: any) {
       console.error("Validator error:", err?.message ?? err);
