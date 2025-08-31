@@ -1,15 +1,15 @@
 import net from "net";
 import fs from "fs";
 import crypto from "crypto";
-import { getBinPayloadSize } from "../utils/binPayloadSize";
+import { getBinPayloadSize } from "../utils/binPayloadSize.js";
 import {
   ASCII_START,
   ASCII_END,
   BIN_HEADER,
   isPrintableAscii,
 } from "./protocols.js";
-import { canFitOnDisk } from "../utils/diskSpace";
-import { BufferManager } from "./bufferManager";
+import { canFitOnDisk } from "../utils/diskSpace.js";
+import { BufferManager } from "./bufferManager.js";
 
 export type AEOptions = {
   host: string;
@@ -141,7 +141,7 @@ export class AEClient {
           const len = getBinPayloadSize(headerBuffer);
 
           this.h.onLog?.(
-            `Binary payload to be received with size ${len} bytes`
+            `Binary payload to be received with size ${len} bytes.`
           );
 
           const canPayloadFit = await canFitOnDisk(len);

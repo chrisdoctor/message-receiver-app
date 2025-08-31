@@ -3,10 +3,10 @@ import { Command, Option } from "commander";
 import "dotenv/config";
 import path from "path";
 import * as fs from "fs";
-import { runValidation } from "./runner";
-import { printHuman } from "./report/printer";
-import { writeJsonReport } from "./report/json";
-import { Mode, ShaMode } from "./report/types";
+import { runValidation } from "./runner.js";
+import { printHuman } from "./report/printer.js";
+import { writeJsonReport } from "./report/json.js";
+import { Mode, ShaMode } from "./report/types.js";
 
 const program = new Command();
 

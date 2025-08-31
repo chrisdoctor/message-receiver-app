@@ -1,4 +1,4 @@
-import { AEClient } from "./client";
+import { AEClient } from "./client.js";
 import {
   openDb,
   counts,
@@ -6,8 +6,8 @@ import {
   createBinarySpool,
   finalizeBinary,
   insertDiscarded,
-} from "./db";
-import { log } from "../utils/logger";
+} from "./db.js";
+import { log } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
 
 export async function runSession(opts: {
