@@ -241,9 +241,9 @@ export class AEClient {
           this.binRemaining
         );
 
-        this.h.onLog?.(
-          `Processing binary data chunk with size ${toWrite} bytes`
-        );
+        // this.h.onLog?.(
+        //   `Processing binary data chunk with size ${toWrite} bytes`
+        // );
 
         // Write directly from chunks without concatenating
         this.writeFromChunks(toWrite);
@@ -260,7 +260,6 @@ export class AEClient {
           this.binHash = crypto.createHash("sha256"); // reset
           // Move tmpfile to final
           const finalPath = this.binTmpPath.replace(/\.part$/, "");
-          this.h.onLog?.("Renaming part file to remove part======");
           fs.renameSync(this.binTmpPath, finalPath);
           await this.h.onBinaryComplete(finalPath, 0, checksum);
           this.binaryMode = false;
@@ -285,9 +284,11 @@ export class AEClient {
     if (fileToDelete && fs.existsSync(fileToDelete)) {
       try {
         fs.unlinkSync(fileToDelete);
-        this.h.onLog?.(`Deleted temp binary spool file: ${fileToDelete}`);
+        this.h.onLog?.(`Deleted temporary binary spool file: ${fileToDelete}`);
       } catch (err) {
-        this.h.onLog?.(`Failed to delete temp file: ${fileToDelete}: ${err}`);
+        this.h.onLog?.(
+          `Failed to delete temporary binary spool file: ${fileToDelete}: ${err}`
+        );
       }
     }
   }
