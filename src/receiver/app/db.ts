@@ -27,11 +27,11 @@ export function openDb(filename: string): DB {
 }
 
 function applyMigrations(db: DB) {
-  db.exec(`
-    DROP TABLE IF EXISTS msgascii;
-    DROP TABLE IF EXISTS msgbinary;
-    DROP TABLE IF EXISTS msgdiscarded;
-  `);
+  // db.exec(`
+  //   DROP TABLE IF EXISTS msgascii;
+  //   DROP TABLE IF EXISTS msgbinary;
+  //   DROP TABLE IF EXISTS msgdiscarded;
+  // `);
 
   //AI-assisted code generation
   db.exec(`
