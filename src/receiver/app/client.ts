@@ -193,7 +193,7 @@ export class AEClient {
     if (!this.isValidAsciiPayload(payloadBuf)) {
       this.asciiMode = false;
       this.bufferManager.consumeBytes(1); // Consume the end marker
-      this.h.onLog?.("Invalid ascii payload, resetting mode");
+      this.h.onLog?.("Discarded ascii payload.");
       return true;
     }
 
@@ -312,12 +312,12 @@ export class AEClient {
 
     for (const c of payloadBuf) {
       if (!isPrintableAscii(c)) {
-        this.h.onLog?.(`Invalid Ascii payload byte: ${c}`);
+        this.h.onLog?.(`Invalid ascii payload byte: ${c}`);
         this.h.onDiscard?.(
           payloadBuf.subarray(0, 15),
           "ascii",
           payloadBuf.length,
-          `Invalid Ascii in payload: ${c}`
+          `Invalid ascii in payload: ${c}`
         );
         return false;
       }
