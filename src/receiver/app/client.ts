@@ -145,7 +145,6 @@ export class AEClient {
           );
 
           const canPayloadFit = await canFitOnDisk(len);
-          this.h.onLog?.(`canPayloadFit = ${canPayloadFit}`);
 
           // Always consume header regardless of disk space
           this.bufferManager.consumeBytes(6);
