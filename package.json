@@ -10,8 +10,8 @@
     "lint": "eslint . --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "validate": "tsx src/validator/cli.ts",
-    "validate:full": "tsx src/validator/cli.ts --mode full --sha verify"
+    "validate": "node dist/validator/cli.js",
+    "validate:full": "node dist/validator/cli.js --mode full --sha verify"
   },
   "keywords": [],
   "author": "",

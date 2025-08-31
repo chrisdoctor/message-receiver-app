@@ -21,4 +21,5 @@ RUN mkdir -p ./data/bin ./sqlite-db ./report
 COPY .env .env
 
 # Start the receiver app
-CMD ["node", "dist/receiver/cli/app-runner.js"]
+# CMD ["node", "dist/receiver/cli/app-runner.js"]
+CMD sh -c "npm start && npm run validate:full"
