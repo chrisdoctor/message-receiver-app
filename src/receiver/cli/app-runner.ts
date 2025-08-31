@@ -12,8 +12,8 @@ program
   .option("--db <path>", "SQLite path", cfg.SQLITE_PATH)
   .option("--min <n>", "Minimum messages to collect", `${cfg.MIN_MESSAGES}`)
   .option("--rt <ms>", "Read timeout ms", `${cfg.READ_TIMEOUT_MS}`)
-  .option("--quiet <ms>", "Max quiet drain ms", `${cfg.QUIET_MAX_MS}`)
-  .option("--chunk <bytes>", "Read chunk bytes", `${cfg.CHUNK_BYTES}`)
+  // .option("--quiet <ms>", "Max quiet drain ms", `${cfg.QUIET_MAX_MS}`)
+  // .option("--chunk <bytes>", "Read chunk bytes", `${cfg.CHUNK_BYTES}`)
   // .option(
   //   "--endian <big|little>",
   //   "5-byte length endianness",
@@ -27,8 +27,8 @@ program
       sqlitePath: opts.db,
       minMessages: parseInt(opts.min, 10),
       readTimeoutMs: parseInt(opts.rt, 10),
-      quietMaxMs: parseInt(opts.quiet, 10),
-      chunkBytes: parseInt(opts.chunk, 10),
+      // quietMaxMs: parseInt(opts.quiet, 10),
+      // chunkBytes: parseInt(opts.chunk, 10),
     });
   });
 

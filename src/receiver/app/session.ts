@@ -15,10 +15,10 @@ export async function runSession(opts: {
   port: number;
   jwt: string;
   readTimeoutMs: number;
-  chunkBytes: number;
+  // chunkBytes: number;
   sqlitePath: string;
   minMessages: number;
-  quietMaxMs: number;
+  // quietMaxMs: number;
 }) {
   const sessionId = uuidv4();
   const db = openDb(opts.sqlitePath);
@@ -34,7 +34,7 @@ export async function runSession(opts: {
       port: opts.port,
       jwt: opts.jwt,
       readTimeoutMs: opts.readTimeoutMs,
-      chunkBytes: opts.chunkBytes,
+      // chunkBytes: opts.chunkBytes,
     },
     {
       onAscii: async (payload) => {
