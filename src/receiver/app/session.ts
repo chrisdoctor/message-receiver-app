@@ -8,6 +8,7 @@ import {
   insertDiscarded,
 } from "./db";
 import { log } from "../utils/logger";
+import { v4 as uuidv4 } from "uuid";
 
 export async function runSession(opts: {
   host: string;
@@ -20,6 +21,7 @@ export async function runSession(opts: {
   minMessages: number;
   quietMaxMs: number;
 }) {
+  const sessionId = uuidv4();
   const db = openDb(opts.sqlitePath);
   const startCounts = counts(db);
   log.info({ startCounts }, "starting session");
@@ -38,17 +40,24 @@ export async function runSession(opts: {
     },
     {
       onAscii: async (payload) => {
-        await writeAscii(db, payload);
+        await writeAscii(db, sessionId, payload);
         asciiCount++;
       },
       onBinaryStart: async (declaredLen) => createBinarySpool(declaredLen),
       onBinaryChunk: async () => {}, // handled internally in client onData processing
       onBinaryComplete: async (finalPath, _declaredLen, checksum) => {
-        await finalizeBinary(db, finalPath, checksum!);
+        await finalizeBinary(db, sessionId, finalPath, checksum!);
         binCount++;
       },
       onDiscard: (payloadPreview, payloadType, totalLen, reason) =>
-        insertDiscarded(db, payloadPreview, payloadType, totalLen, reason),
+        insertDiscarded(
+          db,
+          sessionId,
+          payloadPreview,
+          payloadType,
+          totalLen,
+          reason
+        ),
       onError: (e) => log.error(e, "stream error"),
       onLog: (m) => log.info(m),
     }

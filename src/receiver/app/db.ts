@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import fs from "fs";
+import path from "path";
 
 export type DB = Database.Database;
 let db: DB;
@@ -17,16 +17,18 @@ export function openDb(filename: string): DB {
 }
 
 function applyMigrations(db: DB) {
-  // db.exec(`
-  //   DROP TABLE IF EXISTS msgascii;
-  //   DROP TABLE IF EXISTS msgbinary;
-  // `);
+  db.exec(`
+    DROP TABLE IF EXISTS msgascii;
+    DROP TABLE IF EXISTS msgbinary;
+    DROP TABLE IF EXISTS msgdiscarded;
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS msgascii (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       payload TEXT NOT NULL,
       payload_len INTEGER NOT NULL,
+       session_id TEXT NOT NULL,
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -35,6 +37,7 @@ function applyMigrations(db: DB) {
       payload_path TEXT NOT NULL,
       payload_len INTEGER NOT NULL,
       checksum TEXT,
+      session_id TEXT NOT NULL,
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -44,6 +47,7 @@ function applyMigrations(db: DB) {
       payload_type TEXT NOT NULL,
       payload_total_len INTEGER NOT NULL,
       discard_reason TEXT NOT NULL,
+      session_id TEXT NOT NULL,
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -52,24 +56,25 @@ function applyMigrations(db: DB) {
   fs.mkdirSync(spool, { recursive: true });
 }
 
-export function insertAscii(db: DB, payload: string) {
+export function insertAscii(db: DB, sessionId: string, payload: string) {
   const stmt = db.prepare(
-    `INSERT INTO msgascii (payload, payload_len) VALUES (?, ?)`
+    `INSERT INTO msgascii (payload, payload_len, session_id) VALUES (?, ?, ?)`
   );
-  const info = stmt.run(payload, payload.length);
+  const info = stmt.run(payload, payload.length, sessionId);
   return info.lastInsertRowid as number;
 }
 
 export function insertBinary(
   db: DB,
+  sessionId: string,
   payloadPath: string,
   len: number,
   checksum?: string
 ) {
   const stmt = db.prepare(
-    `INSERT INTO msgbinary (payload_path, payload_len, checksum) VALUES (?, ?, ?)`
+    `INSERT INTO msgbinary (payload_path, payload_len, checksum, session_id) VALUES (?, ?, ?, ?)`
   );
-  const info = stmt.run(payloadPath, len, checksum ?? null);
+  const info = stmt.run(payloadPath, len, checksum ?? null, sessionId);
   return info.lastInsertRowid as number;
 }
 
@@ -83,8 +88,8 @@ export function counts(db: DB) {
   return { ascii: ascii.c, binary: bin.c, total: ascii.c + bin.c };
 }
 
-export async function writeAscii(db: DB, payload: string) {
-  return insertAscii(db, payload);
+export async function writeAscii(db: DB, sessionId: string, payload: string) {
+  return insertAscii(db, sessionId, payload);
 }
 
 export async function createBinarySpool(declaredLen: number) {
@@ -95,16 +100,18 @@ export async function createBinarySpool(declaredLen: number) {
 
 export async function finalizeBinary(
   db: DB,
+  sessionId: string,
   finalPath: string,
   checksum: string
 ) {
   const stat = fs.statSync(finalPath);
-  const id = insertBinary(db, finalPath, stat.size, checksum);
+  const id = insertBinary(db, sessionId, finalPath, stat.size, checksum);
   return id;
 }
 
 export function insertDiscarded(
   db: DB,
+  sessionId: string,
   payload: Buffer,
   payloadType: "ascii" | "binary",
   totalLen: number,
@@ -112,7 +119,7 @@ export function insertDiscarded(
 ) {
   const preview = payload.subarray(0, 15);
   const stmt = db.prepare(
-    `INSERT INTO msgdiscarded (payload_preview, payload_type, payload_total_len, discard_reason) VALUES (?, ?, ?, ?)`
+    `INSERT INTO msgdiscarded (payload_preview, payload_type, payload_total_len, discard_reason, session_id) VALUES (?, ?, ?, ?, ?)`
   );
-  stmt.run(preview, payloadType, totalLen, reason);
+  stmt.run(preview, payloadType, totalLen, reason, sessionId);
 }
