@@ -16,6 +16,9 @@ const dataDir =
 fs.mkdirSync(dataDir, { recursive: true });
 
 export function openDb(filename: string): DB {
+  const dbDir = path.dirname(process.env.SQLITE_PATH || "./sqlite-db/ae.db");
+  fs.mkdirSync(dbDir, { recursive: true });
+
   db = new Database(filename);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");

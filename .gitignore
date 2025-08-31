@@ -6,3 +6,4 @@ dist
 tmp/
 data
 report
+sqlite-db
