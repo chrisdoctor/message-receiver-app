@@ -30,6 +30,7 @@ function applyMigrations(db: DB) {
     DROP TABLE IF EXISTS msgdiscarded;
   `);
 
+  //AI-assisted code generation
   db.exec(`
     CREATE TABLE IF NOT EXISTS msgascii (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

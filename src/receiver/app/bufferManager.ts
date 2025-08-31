@@ -1,5 +1,5 @@
 /**
- * Efficient buffer manager for handling streaming data without excessive concatenation
+ * Fully AI generated: Efficient buffer manager for handling streaming data without excessive concatenation
  */
 export class BufferManager {
   private bufferChunks: Buffer[] = [];
