@@ -1,3 +1,4 @@
+// AI-assisted code
 export function getBinPayloadSize(buffer: Buffer): number {
   // Read 5 bytes starting at offset 1
   const offset = 1;

@@ -97,13 +97,14 @@ export class AEClient {
     this.processing = false;
   }
 
+  // AI-Assisted code generation
   private async _processData(chunk: Buffer) {
     // SINGLE discard check - handles all discard scenarios
     if (this.binDiscardBytes > 0) {
       const toDiscard = Math.min(chunk.length, this.binDiscardBytes);
-      this.h.onLog?.(
-        `Discarding ${toDiscard} bytes of binary payload; ${this.binDiscardBytes - toDiscard} remaining`
-      );
+      // this.h.onLog?.(
+      //   `Discarding ${toDiscard} bytes of binary payload; ${this.binDiscardBytes - toDiscard} remaining`
+      // );
       this.binDiscardBytes -= toDiscard;
 
       if (this.binDiscardBytes === 0) {
@@ -152,6 +153,10 @@ export class AEClient {
             // Simple discard mode - just set the counter
             this.h.onLog?.("Not enough disk space; discarding binary payload");
             this.binDiscardBytes = len;
+
+            // Clear the temporary file if it was created
+            this.deleteBinFile(this.binTmpPath);
+            this.binTmpPath = "";
 
             // Immediately discard any available payload data
             const availableToDiscard = Math.min(
@@ -255,6 +260,7 @@ export class AEClient {
           this.binHash = crypto.createHash("sha256"); // reset
           // Move tmpfile to final
           const finalPath = this.binTmpPath.replace(/\.part$/, "");
+          this.h.onLog?.("Renaming part file to remove part======");
           fs.renameSync(this.binTmpPath, finalPath);
           await this.h.onBinaryComplete(finalPath, 0, checksum);
           this.binaryMode = false;
@@ -272,6 +278,18 @@ export class AEClient {
       fs.writeSync(this.binFd, chunkSlice);
       this.binHash.update(chunkSlice);
     });
+  }
+
+  private deleteBinFile(tmpFile: string): void {
+    const fileToDelete = tmpFile.replace(/\.part$/, "");
+    if (fileToDelete && fs.existsSync(fileToDelete)) {
+      try {
+        fs.unlinkSync(fileToDelete);
+        this.h.onLog?.(`Deleted temp binary spool file: ${fileToDelete}`);
+      } catch (err) {
+        this.h.onLog?.(`Failed to delete temp file: ${fileToDelete}: ${err}`);
+      }
+    }
   }
 
   private isValidAsciiPayload(payloadBuf: Buffer): boolean {
