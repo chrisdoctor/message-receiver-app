@@ -5,7 +5,14 @@ import path from "path";
 export type DB = Database.Database;
 let db: DB;
 
-const dataDir = path.join(process.cwd(), "data", "bin");
+// const dataDir = path.join(process.cwd(), "data", "bin");
+// fs.mkdirSync(dataDir, { recursive: true });
+
+// Use BINARY_SPOOL_DIR from env, default to "<project-root>/tmp/spool"
+const dataDir =
+  process.env.BINARY_SPOOL_DIR && process.env.BINARY_SPOOL_DIR.trim() !== ""
+    ? path.resolve(process.env.BINARY_SPOOL_DIR)
+    : path.resolve(process.cwd(), "tmp", "spool");
 fs.mkdirSync(dataDir, { recursive: true });
 
 export function openDb(filename: string): DB {
@@ -28,7 +35,7 @@ function applyMigrations(db: DB) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       payload TEXT NOT NULL,
       payload_len INTEGER NOT NULL,
-       session_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -51,9 +58,6 @@ function applyMigrations(db: DB) {
       inserted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
-
-  const spool = path.join(process.cwd(), "tmp", "spool");
-  fs.mkdirSync(spool, { recursive: true });
 }
 
 export function insertAscii(db: DB, sessionId: string, payload: string) {
