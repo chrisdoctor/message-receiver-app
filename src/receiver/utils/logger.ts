@@ -1,5 +1,5 @@
 import pino from "pino";
-
+// AI-generated code
 export const log = pino({
   level: process.env.LOG_LEVEL ?? "info",
   transport:
