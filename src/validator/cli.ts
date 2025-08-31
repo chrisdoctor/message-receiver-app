@@ -1,17 +1,27 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
+import "dotenv/config";
 import { runValidation } from "./runner";
 import { printHuman } from "./report/printer";
 import { writeJsonReport } from "./report/json";
 import { Mode, ShaMode } from "./report/types";
 
 const program = new Command();
+
+// Require DB path from env; do NOT allow CLI override
+const ENV_DB_PATH = process.env.SQLITE_PATH;
+if (!ENV_DB_PATH || ENV_DB_PATH.trim() === "") {
+  console.error(
+    "Error: SQLITE_PATH must be set in the .env (path to the SQLite DB)."
+  );
+  process.exit(1);
+}
+
 program
   .name("aetheric-validator")
   .description(
     "Validates that the TCP collector parsed and stored ASCII & binary correctly"
   )
-  .option("--db <path>", "SQLite DB path", "./ae.db")
   .addOption(
     new Option("--mode <mode>").choices(["full", "fast"]).default("full")
   )
@@ -35,7 +45,7 @@ program
   .action(async (opts) => {
     try {
       const rep = await runValidation({
-        dbPath: opts.db as string,
+        dbPath: ENV_DB_PATH,
         mode: opts.mode as Mode,
         sha: opts.sha as ShaMode,
         sample: Number.isFinite(opts.sample)
