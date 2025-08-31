@@ -8,11 +8,11 @@ let db: DB;
 // const dataDir = path.join(process.cwd(), "data", "bin");
 // fs.mkdirSync(dataDir, { recursive: true });
 
-// Use BINARY_SPOOL_DIR from env, default to "<project-root>/tmp/spool"
+// Use BINARY_SPOOL_DIR from env, default to "<project-root>/data/bin"
 const dataDir =
   process.env.BINARY_SPOOL_DIR && process.env.BINARY_SPOOL_DIR.trim() !== ""
     ? path.resolve(process.env.BINARY_SPOOL_DIR)
-    : path.resolve(process.cwd(), "tmp", "spool");
+    : path.resolve(process.cwd(), "data", "bin");
 fs.mkdirSync(dataDir, { recursive: true });
 
 export function openDb(filename: string): DB {
